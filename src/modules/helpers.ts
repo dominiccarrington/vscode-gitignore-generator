@@ -1,8 +1,9 @@
 import * as os from "os";
 import { window } from "vscode";
-import { readFile } from "./filesystem";
+import { readFile, fileExists } from "./filesystem";
 import { getData } from "./http";
 import { API_URL, BANNER, USER_RULES } from "./config";
+import { dirname } from "path";
 
 export async function getList(path: string | null, keepCurrent: boolean) {
     const data = await getData(`${API_URL}/list`);
@@ -45,6 +46,45 @@ export function getOs() {
     return system ? system : null;
 }
 
+export function getProjectSelected(dirPath: string): string[] {
+    let detected: string[] = [];
+
+    const DETECTIONS: {[key: string]: string[]} = {
+        "bower": [
+            "bower.json"
+        ],
+        "composer": [
+            "composer.json"
+        ],
+        "git": [
+            ".git"
+        ],
+        "gradle": [
+            "settings.gradle",
+            "settings.gradle.kts",
+            "build.gradle",
+            "build.gradle.kts"
+        ],
+        "node": [
+            "package.json"
+        ],
+        "ruby": [
+            "Gemfile"
+        ],
+    };
+
+    for (const key in DETECTIONS) {
+        if (Object.prototype.hasOwnProperty.call(DETECTIONS, key)) {
+            const element = DETECTIONS[key];
+            if (element.reduce((agg, val) => agg || fileExists(dirPath + "/" + val), false)) {
+                detected.push(key);
+            }
+        }
+    }
+    
+    return detected;
+}
+
 export function getCurrentItems(path: string) {
     const file = readFile(path);
 
@@ -79,7 +119,7 @@ export function getSelectedItems(
     const selected = [];
 
     if (!keepCurrent) {
-        selected.push("visualstudiocode", getOs());
+        selected.push("visualstudiocode", getOs(), ...getProjectSelected(dirname(filePath)));
     }
 
     if (keepCurrent && filePath) {
